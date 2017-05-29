@@ -1,6 +1,6 @@
 # Bounty-Food-Locator
 
-There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an agent app that allows the field agent to transmit his whereabouts to his manager / supervisor.
+There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an agent app that allows the field agent to transmit his whereabouts to the customer
 
 ## Delivery agent user flow
 - Confirm pick-up (consent to start location tracking)
