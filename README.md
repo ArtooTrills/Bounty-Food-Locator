@@ -1,16 +1,16 @@
 # Bounty-Food-Locator
 
-There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an agent app that allows the field agent to transmit his whereabouts to the customer
+There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an app that allows the delivery agent to transmit his whereabouts to the customer
 
 ## Delivery agent user flow
 - Confirm pick-up (consent to start location tracking)
 - Start driving towards the customer location (save location to the server every 5 minutes)
 - Confirm delivery (end location tracking)
 
-## Supervisor user flow
+## Customer user flow
 - Check the current location of the delivery agent
-- Get notified if the delivery is not done 15 mins after pick-up
-- Bonus - see all paths taken by the agent during the course of the day 
+- Get notified if the delivery is delayed even after pick-up
+- Bonus: see all paths taken by the agent during the course of the day (useful for the agent's manager)
 
 ## Suggested resources
 - Use Firebase for [Push Notifications](https://firebase.google.com/docs/cloud-messaging/android/client) and to [save location data](https://firebase.google.com/docs/database/)
@@ -19,6 +19,7 @@ There are many popular online food delivery services. Delivery agents carry andr
 ## What are we looking for
 - Code structure
 - Test cases
+- Android Studio tools
 - Documentation / Comments
 
 ## Final Words
