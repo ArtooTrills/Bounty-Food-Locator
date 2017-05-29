@@ -1,24 +1,18 @@
 # Bounty-Location-Tracker
 
-Artoo's Android app helps field agents of lending institutions collect information of their customers at their house or business location. Each field agent is allocated a certain sales zone and they can work within their zone
+There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an agent app that allows the field agent to transmit his whereabouts to his manager / supervisor.
 
-Build a feature in the app that allows the field agent to transmit his whereabouts during during work hours
-
-## Field agent user flow
-**One time set-up:** Save current location to define the zone. You can assume 2km radius from current location
-
-- Start your day (consent to start location tracking)
-- Collect basic details about customers (you can skip this)
-- Current location is saved in the server every 5 minutes
-- End your day (end location tracking)
+## Delivery agent user flow
+- Confirm pick-up (consent to start location tracking)
+- Start driving towards the customer location (save location to the server every 5 minutes)
+- Confirm delivery (end location tracking)
 
 ## Supervisor user flow
+- Check the current location of the delivery agent
+- Get notified if the delivery is not done 15 mins after pick-up
+- Bonus - see all paths taken by the agent during the course of the day 
 
-- Check the current location of the field agent
-- Get notified if the field agent is working outside his allocated zone
-- Bonus - see the entire path taken during the course of the day 
-
-## Resources
+## Suggested resources
 - Use Firebase for [Push Notifications](https://firebase.google.com/docs/cloud-messaging/android/client) and to [save location data](https://firebase.google.com/docs/database/)
 - Use DDMS to simulate location movement
 
