@@ -1,6 +1,6 @@
 # Bounty-Food-Locator
 
-There are many popular online food delivery services. Delivery agents carry android phones to receive notifcations of pickups and deliveries. Build an app that allows the delivery agent to transmit his whereabouts to the customer
+There are many popular online food delivery services. The promise is to deliver within 20 minutes once the food has been picked up from the restaurant. Build an app that allows the delivery agent to transmit his whereabouts to the customer
 
 ## Delivery agent user flow
 - Confirm pick-up (consent to start location tracking)
