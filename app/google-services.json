@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "637054681692",
+    "firebase_url": "https://myapplication2-2532f.firebaseio.com",
+    "project_id": "myapplication2-2532f",
+    "storage_bucket": "myapplication2-2532f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637054681692:android:f6b7389b0a28a3f0",
+        "android_client_info": {
+          "package_name": "rishab.com.myapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "637054681692-drf03an5lsbn6cskn3hrtpkoa0o4kuun.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "rishab.com.myapplication",
+            "certificate_hash": "3c6e999b7af07883d9ffa7b3ab98c6280298bae0"
+          }
+        },
+        {
+          "client_id": "637054681692-fg2av286boudr12daibk7j3novgvsa27.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSj0VRWO1-AqUqI0GB6ewSKQ8C0KEmOco"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "637054681692-fg2av286boudr12daibk7j3novgvsa27.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
