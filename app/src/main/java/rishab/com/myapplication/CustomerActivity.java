@@ -24,16 +24,19 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.iid.FirebaseInstanceId;
 
 import java.util.ArrayList;
 
 
-public class CustomerActivity extends AppCompatActivity implements LocationListener {
+public class CustomerActivity extends AppCompatActivity {
 
     public static final String TAG = "CustomerActivity";
     FirebaseDatabase database ;
@@ -41,8 +44,6 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
     TextView addressView;
     String value=null;
     Double lat,lon;
-    Location userloc = new Location("userloc");
-    Float distance = Float.MAX_VALUE;
     LocationManager locationManager;
     private Boolean AppStart=false;
     ArrayList<String> AllLocations;
@@ -59,6 +60,7 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
         {
             e.getMessage();
         }
+
         //to check internet connection
         final ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
@@ -90,7 +92,11 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
             return;
         }
         database.goOnline();
-        getUserLoc();
+        // Method to get the user current location
+        //getUserLoc();
+        // default user location
+//        userloc.setLatitude(27.21623501);
+//        userloc.setLongitude(78.01350283);
         DatabaseReference myRef = database.getReference("LatestLocation");
         DatabaseReference myRef1 = database.getReference("Location");
         // to get the latest location of the agent
@@ -99,12 +105,15 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 // This method is called once with the initial value and again
-                // whenever data at this location is updated.
+                // whenever  latest location is updated.
                 value = dataSnapshot.child("String").getValue(String.class);
                 lat = dataSnapshot.child("lat").getValue(Double.class);
                 lon = dataSnapshot.child("lon").getValue(Double.class);
-                userloc.setLatitude(lat);
-                userloc.setLatitude(lon);
+
+//                agentloc.setLatitude(lat);
+//                agentloc.setLatitude(lon);
+                //Send the delayed notification to the user if the distance between the user and the agent increses
+                //DelayNotification(agentloc,userloc);
                 //addressView.setText(value);
                 Log.d(TAG, "Value is: " + value);
             }
@@ -116,25 +125,36 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
             }
         });
         // to get all the location of the agents
-        myRef1.addValueEventListener(new ValueEventListener() {
+        AllLocations = new ArrayList<>();
+        myRef1.addChildEventListener(new ChildEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                AllLocations = new ArrayList<String>();
-                for (DataSnapshot messageSnapshot: dataSnapshot.getChildren()) {
-                    AddressLocation addressLocation = messageSnapshot.getValue(AddressLocation.class);
-                    AllLocations.add(addressLocation.getLocationAddress());
-                    ShowAllLocation(AllLocations);
-                    Log.d("addressLocation",addressLocation.getLocationAddress());
-                }
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                AddressLocation addressLocation = dataSnapshot.getValue(AddressLocation.class);
+                AllLocations.add(addressLocation.getLocationAddress());
+                ShowAllLocation(AllLocations);
+                Log.d("addressLocation",addressLocation.getLocationAddress());
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                Toast.makeText(getApplicationContext(), "Databse connection error", Toast.LENGTH_SHORT).show();
-                Log.e("databaseError",databaseError.getMessage());
+
             }
         });
-
     }
 
     @Override
@@ -158,8 +178,6 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
             ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
             return;
         }
-        if(locationManager!=null)
-            locationManager.removeUpdates(this);
         AppStart=false;
         if(FirebaseDatabase.getInstance()!=null){
             FirebaseDatabase.getInstance().goOffline();
@@ -171,79 +189,6 @@ public class CustomerActivity extends AppCompatActivity implements LocationListe
             addressView.setText("Location Not available");
         }else {
             addressView.setText(value);
-        }
-    }
-    // method to get the user location
-    public void getUserLoc()
-    {
-        try {
-
-            String provide = locationManager.getBestProvider(new Criteria(), true);
-            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
-                return;
-            }
-            locationManager.requestLocationUpdates(provide, 300000, 0, this);
-            Location location = locationManager.getLastKnownLocation(provide);
-            //progressDialog.show();
-            if (location != null) {
-                //Toast.makeText(this, "LOCATION FOUND", Toast.LENGTH_SHORT).show();
-                Log.d("User Last Location", String.valueOf(location.getLatitude()));
-                Log.d("User Last Location", String.valueOf(location.getLongitude()));
-                //address(location);
-                //return location;
-            }
-            else {
-                Log.w("User Last Location", "LOCATION NOT FOUND");
-                //Toast.makeText(this, "LOCATION NOT FOUND", Toast.LENGTH_SHORT).show();
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-    }
-    @Override
-    public void onLocationChanged(Location location) {
-        Log.d("onLocation", "LOCATION FOUND");
-        //Toast.makeText(this, "LOCATION FOUND", Toast.LENGTH_SHORT).show();
-        DelayNotification(location.distanceTo(userloc));
-    }
-
-    @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
-    }
-    // method to issue the notification if the distance between the user location
-    // and the agent current location increases afterthe pickup of the delivery
-    public void DelayNotification(Float dist){
-        if(dist<distance){
-            distance=dist;
-        }
-        else{
-        NotificationCompat.Builder builder = (NotificationCompat.Builder) new NotificationCompat.Builder(this)
-                .setSmallIcon(R.drawable.cast_ic_notification_small_icon)
-                .setContentTitle("Notification")
-                .setContentText("Delivery Delayed")
-                .setAutoCancel(true);
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        mNotificationManager.notify (0,builder.build());
-            distance=dist;
         }
     }
     //to enable gps

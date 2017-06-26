@@ -1,21 +1,25 @@
 package rishab.com.myapplication;
 
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Address;
-import android.location.Criteria;
 import android.location.Geocoder;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.CountDownTimer;
+import android.os.AsyncTask;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -23,14 +27,27 @@ import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.ActivityRecognition;
+import com.google.android.gms.location.DetectedActivity;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
+import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import org.apache.http.message.BasicNameValuePair;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements LocationListener {
+public class MainActivity extends AppCompatActivity implements  GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, com.google.android.gms.location.LocationListener {
 
     private static final String TAG = "ADDRESS";
     private static final int ACCESS_FINE_LOCATION_CODE = 0;
@@ -39,23 +56,30 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     TextView addresstextView;
     ProgressDialog progressDialog;
     ConnectivityManager connectivityManager;
-    private Boolean AppStart=false;
+    private Boolean AppStart = false;
     String result = null;
-    CountDownTimer countDownTimer;
+    private GoogleApiClient googleApiClient;
+    private LocationRequest locationRequest;
+    int stillamt=0;
+    FirebaseDatabase database;
+    String id=null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        database = FirebaseDatabase.getInstance();
+        googleApiClient = new GoogleApiClient.Builder(this).addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this).build();
+
         try {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
-        catch(Exception e)
-        {
+        } catch (Exception e) {
             e.getMessage();
         }
         //To check internet connection
-         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE).getState().equals(NetworkInfo.State.DISCONNECTED) &&
                 connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI).getState().equals(NetworkInfo.State.DISCONNECTED)) {
             AlertDialog alertDialog = new AlertDialog.Builder(this)
@@ -74,6 +98,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     @Override
     protected void onStart() {
         super.onStart();
+
         //To check gps is on or not
         if (connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE).getState().equals(NetworkInfo.State.CONNECTED) ||
                 connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI).getState().equals(NetworkInfo.State.CONNECTED)) {
@@ -87,180 +112,69 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                 EnableNetwork();
             }
         }
-        countDownTimer = new CountDownTimer(45000,1000) {
+        DatabaseReference reference = database.getReference("FirebaseId");
+        reference.addValueEventListener(new ValueEventListener() {
             @Override
-            public void onTick(long l) {
-                
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                id = dataSnapshot.getValue().toString();
+
             }
 
             @Override
-            public void onFinish() {
-                progressDialog.cancel();
-                Toast.makeText(getApplicationContext(), "Unable to get Location pleasse try again", Toast.LENGTH_SHORT).show();
+            public void onCancelled(DatabaseError databaseError) {
+
             }
-        };
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (locationManager!=null&&!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)&&AppStart) {
+        if (locationManager != null && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && AppStart) {
             EnableNetwork();
         }
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
     //Pickup button action listener
     public void Pickupbtn(View view) {
         if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
+            //  Consider calling
             //    ActivityCompat#requestPermissions
             // here to request the missing permissions, and then overriding
             //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
-            ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, ACCESS_FINE_LOCATION_CODE);
             return;
         }
-        checkGps();
-        countDownTimer.start();
+        googleApiClient.connect();
+        progressDialog.show();
+        stillamt=0;
+//        SendNotification sendNotification = new SendNotification();
+//        sendNotification.execute("Your package has been picked-up",id);
     }
 
-
-    //check GPS connectivity and request to get the current location of the agent
-    public void checkGps() {
-        try {
-            //checking for the best available provider
-            String provide = locationManager.getBestProvider(new Criteria(), true);
-            if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
-                return;
-            }
-            //requesting Location listener
-            locationManager.requestLocationUpdates(provide, 300000, 0, this);
-            Location location = locationManager.getLastKnownLocation(provide);
-            progressDialog.show();
-            if (location != null) {
-                //Toast.makeText(this, "LOCATION FOUND", Toast.LENGTH_SHORT).show();
-                Log.d("Last Location","LOCATION FOUND");
-                Log.d("getLatitude", String.valueOf(location.getLatitude()));
-                Log.d("getLongitude", String.valueOf(location.getLongitude()));
-                //SendDataToServer("demo",location);
-                //address(location);
-                //return location;
-            }
-            else {
-                //Toast.makeText(this, "LOCATION NOT FOUND", Toast.LENGTH_SHORT).show();
-                Log.d("Last Location","LOCATION NOT FOUND");
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-//            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-//                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-//                    //  Consider calling
-//                    //    ActivityCompat#requestPermissions
-//                    // here to request the missing permissions, and then overriding
-//                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-//                    //                                          int[] grantResults)
-//                    // to handle the case where the user grants the permission. See the documentation
-//                    // for ActivityCompat#requestPermissions for more details.
-//                    ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
-//                }
-//                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 300000, 0, this);
-//                 location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-//                if (location != null) {
-//                    Toast.makeText(this, "LOCATION FOUND2", Toast.LENGTH_SHORT).show();
-//                    Log.e("getLatitude", String.valueOf(location.getLatitude()));
-//                    Log.e("getLongitude", String.valueOf(location.getLongitude()));
-//                    //return location;
-//                } else {
-//                    Toast.makeText(this, "LOCATION NOT FOUND1", Toast.LENGTH_SHORT).show();
-//                    //return null;
-//                }
-//            }
-//            if(locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)){
-//                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-//                    //  Consider calling
-//                    //    ActivityCompat#requestPermissions
-//                    // here to request the missing permissions, and then overriding
-//                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-//                    //                                          int[] grantResults)
-//                    // to handle the case where the user grants the permission. See the documentation
-//                    // for ActivityCompat#requestPermissions for more details.
-//                    ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
-//                }
-//                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 300000, 0, this);
-//                location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-//            if (location != null) {
-//                Toast.makeText(this, "LOCATION FOUND2", Toast.LENGTH_SHORT).show();
-//                Log.e("getLatitudeNET", String.valueOf(location.getLatitude()));
-//                Log.e("getLongitudeNET", String.valueOf(location.getLongitude()));
-//                //return location;
-//            } else {
-//                Toast.makeText(this, "LOCATION NOT FOUND", Toast.LENGTH_SHORT).show();
-//                //return null;
-//            }
-//        }
-//        else {
-//            Toast.makeText(this, "CONNECTION LOST", Toast.LENGTH_SHORT).show();
-//        }
-//        }catch (Exception e){
-//            e.printStackTrace();
-//        }
-    }
 
     //To get permission if the permission is not given
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch(requestCode){
+        switch (requestCode) {
             case ACCESS_FINE_LOCATION_CODE:
-                if (grantResults.length > 0&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(getApplication(),"Permission granted",Toast.LENGTH_SHORT).show();
-                }
-                else {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(getApplication(), "Permission granted", Toast.LENGTH_SHORT).show();
+                } else {
                     Toast.makeText(getApplication(), "Permission denied", Toast.LENGTH_SHORT).show();
                 }
                 break;
         }
     }
 
-    @Override
-    public void onLocationChanged(Location location) {
-        Log.d("onLocationChanged", String.valueOf(location.getLatitude()));
-        Log.d("onLocationChanged", String.valueOf(location.getLongitude()));
-        progressDialog.cancel();
-        countDownTimer.cancel();
-        if(location!=null){
-            //To get the address of the current location
-            address(location);
-        }
-        else {
-            Toast.makeText(this, "LOCATION NOT FOUND ON", Toast.LENGTH_SHORT).show();
-        }
-        //newlocation=location;
-    }
-
-    @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
-    }
     //to enable gps from settings
     public void EnableNetwork() {
         final AlertDialog.Builder alertDialog = new AlertDialog.Builder(this);
@@ -271,11 +185,12 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             public void onClick(DialogInterface dialogInterface, int i) {
                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 startActivity(intent);
-                AppStart=true;
+                AppStart = true;
             }
         }).setCancelable(false);
         alertDialog.show();
     }
+
     // method to get address form location
     public void address(Location location) {
         Geocoder geocoder = new Geocoder(this, Locale.getDefault());
@@ -294,19 +209,20 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                 //sb.append(address.getCountryName());
                 result = sb.toString();
                 addresstextView.setText(result);
-                SendDataToServer(result,location);
+                SendDataToServer(result, location);
                 Log.d("FirebaseData", String.valueOf(locnum));
             }
         } catch (IOException e) {
             Log.e(TAG, "Unable connect to Geocoder");
         }
     }
+
     // sending the address to the firebase database
-    public void SendDataToServer(String address,Location location) {
+    public void SendDataToServer(String address, Location location) {
         //SimpleDateFormat sdf = new SimpleDateFormat("ddMMyyHHmmss");
         //Date date = Calendar.getInstance().getTime();
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        if(database==null){
+
+        if (database == null) {
             Toast.makeText(this, "Could not connect to database", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -314,29 +230,27 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         DatabaseReference myRef = database.getReference("Location");
         String a = myRef.push().getKey();
         DatabaseReference myRef1 = database.getReference("LatestLocation/String");
-        AddressLocation address1 = new AddressLocation(address,location.getLatitude(),location.getLongitude());
+        AddressLocation address1 = new AddressLocation(address, location.getLatitude(), location.getLongitude());
         myRef.child(a).setValue(address1, new DatabaseReference.CompletionListener() {
             @Override
             public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
-                Log.e("Location","LOCATION Saved");
+                Log.e("Location", "LOCATION Saved");
             }
 
         });
-        //myRef.setValue(address);
         myRef1.setValue(address);
-        //myRef = database.getReference("Location"+sdf.format(date)+"/lat");
         myRef1 = database.getReference("LatestLocation/lat");
-        //myRef.setValue();
         myRef1.setValue(location.getLatitude());
-        //myRef = database.getReference("Location"+sdf.format(date)+"/lat");
         myRef1 = database.getReference("LatestLocation/lon");
-        //myRef.setValue(location.getLongitude());
         myRef1.setValue(location.getLongitude());
+
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+        if(googleApiClient.isConnected())
+            googleApiClient.disconnect();
         if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
             //    ActivityCompat#requestPermissions
@@ -345,13 +259,13 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
-            ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, ACCESS_FINE_LOCATION_CODE);
             return;
         }
-        if(locationManager!=null)
-            locationManager.removeUpdates(this);
-        AppStart=false;
-        if(FirebaseDatabase.getInstance()!=null){
+//        if (locationManager != null)
+//            locationManager.removeUpdates(this);
+        AppStart = false;
+        if (FirebaseDatabase.getInstance() != null) {
             FirebaseDatabase.getInstance().goOffline();
         }
     }
@@ -367,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         super.onBackPressed();
         finish();
     }
+
     // to stop the location listener request
     public void Deliveredbtn(View view) {
         if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -377,12 +292,76 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
-            ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},ACCESS_FINE_LOCATION_CODE);
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, ACCESS_FINE_LOCATION_CODE);
             return;
         }
-        if(locationManager!=null) {
-            locationManager.removeUpdates(this);
+
+
+        if(googleApiClient.isConnected()){
+            googleApiClient.disconnect();
             addresstextView.setText("Item Delevired");
+        }
+
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        locationRequest = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                .setInterval(300000);
+
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient,locationRequest,this);
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.e("Location","Connection Suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.e("Location","Connection Failed");
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        Log.e("Location","Location Changed");
+        progressDialog.cancel();
+        address(location);
+    }
+
+    public void delaydelivery(View view){
+        SendNotification sendNotification = new SendNotification();
+        sendNotification.execute("Your package has been delayed",id);
+    }
+
+    public class SendNotification extends AsyncTask<String,Void,String>{
+        @Override
+        protected String doInBackground(String... strings) {
+            ArrayList<BasicNameValuePair> list = new ArrayList<>();
+            list.add(new BasicNameValuePair("id",strings[1]));
+            list.add(new BasicNameValuePair("msg",strings[0]));
+            JSONParser jsonParser = new JSONParser();
+            String result = jsonParser.postHttpRequest("http://hubblebubble.000webhostapp.com/Notification.php",list);
+            Log.d("SendNotification",result);
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+
+            Log.d("SendNotification",s);
         }
     }
 }

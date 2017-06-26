@@ -12,8 +12,13 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.iid.FirebaseInstanceId;
 
 public class LauncherActivity extends AppCompatActivity {
 
@@ -55,6 +60,13 @@ public class LauncherActivity extends AppCompatActivity {
                 EnableNetwork();
             }
         }
+        String refreshedToken = FirebaseInstanceId.getInstance().getToken();
+        Log.e("FirebaseId", "Refreshed token: " + refreshedToken);
+        FirebaseDatabase firebaseDatabase= FirebaseDatabase.getInstance();
+        firebaseDatabase.goOnline();
+        DatabaseReference databaseReference = firebaseDatabase.getReference("FirebaseId");
+        databaseReference.setValue(refreshedToken);
+        firebaseDatabase.goOffline();
 
     }
     //to go to agent panel
